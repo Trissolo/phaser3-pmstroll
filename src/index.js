@@ -1,33 +1,25 @@
-import Phaser from './phaser-custom-sprite-loader';
+// import Phaser from './phaser-custom-sprite-loader';
+import Phaser from "phaser";
+import SceneOne from "./scenes/sceneA.mjs";
+
 
 const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#2d2d2d',
-    scene: {
-        preload: preload,
-        create: create
-    }
+    type: Phaser.WEBGL,
+    pixelArt: true,
+    backgroundColor: '#320822',
+    disableContextMenu: true,
+    scale:
+    { 
+        mode: Phaser.Scale.NONE,
+        width: 256,
+        height: 128,
+        zoom: 3
+        // autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    loader: {
+        path: 'assets/'
+    },
+    scene: SceneOne
 };
 
 const game = new Phaser.Game(config);
-
-function preload ()
-{
-    this.load.image('logo', 'assets/logo.png');
-}
-
-function create ()
-{
-    const logo = this.add.image(400, 150, 'logo');
-
-    this.tweens.add({
-        targets: logo,
-        y: 450,
-        duration: 2000,
-        ease: 'Power2',
-        yoyo: true,
-        loop: -1
-    });
-}
