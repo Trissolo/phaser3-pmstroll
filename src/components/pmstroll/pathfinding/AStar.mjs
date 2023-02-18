@@ -25,7 +25,6 @@ export default class Astar
 
         this.heuristic = heuristic;
 
-        //initialize costSoFar
         this.costSoFar = new Map(); // [...graph.keys()].map(el => [el, 0]));   
         this.costSoFar.set(start, 0);
 
@@ -33,30 +32,25 @@ export default class Astar
         this.fScore.set(start, 0)
 
         this.frontier = new PriorityQueue(this.costSoFar);
+        this.frontier.insert(start);
 
-        // visites nodes
+        // visited nodes
         // key<node>
         // value<(node> (cheapest neighbor)
         this.cameFrom = new Map();
+        this.cameFrom.set(start, null)
 
-        // start the search immediately
-        this.search();
     }
 
     search()
     {
         const {frontier, costSoFar, cameFrom, fScore, start, target, graph} = this;
 
-        frontier.insert(start);
-
-        //mark "start" as visited
-        cameFrom.set(start, null)
-
         while(!frontier.isEmpty())
         {
             const currentNode = frontier.pop();
 
-            if (currentNode === target) {return this}
+            if (currentNode === target) {return this.getPath();}
 
             for (const [neighbor, distance] of graph.get(currentNode))
             {
@@ -65,7 +59,8 @@ export default class Astar
                 const betterCost = newCost < costSoFar.get(neighbor);
 
                 // if not yet visited, or already visited but we have a cheaper cost
-                if(!cameFrom.has(neighbor) || betterCost)
+                // (testing: check 'costSoFar' instead 'cameFrom')
+                if(!costSoFar.has(neighbor) || betterCost)
                 {
                     // set or update the cost
                     costSoFar.set(neighbor, newCost);
@@ -73,7 +68,7 @@ export default class Astar
                     // mark as visited / update the path portion
                     cameFrom.set(neighbor, currentNode);
 
-                    // different
+                    // the difference than Dijkstra
                     fScore.set(neighbor, newCost + this.heuristic(neighbor, target));
 
                     // update frontier determine priority
@@ -82,13 +77,11 @@ export default class Astar
             }
         }
 
-        return this
+        return this.getPath()
     }
 
     getPath()
     {
-        // console.log("AStar SIZE:", this.fScore.size);
-
         const path = [];
 
         let {target: currNode} = this;
@@ -102,6 +95,9 @@ export default class Astar
 
         path.push(currNode);
 
+        // Maybe, to avoid putting the start node in the path array maybe we should:
+        // while (cameFrom.get(currNode) !== start)
+        
         while (currNode !== this.start)
         {
             currNode = this.cameFrom.get(currNode);

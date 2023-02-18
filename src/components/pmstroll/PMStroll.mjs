@@ -255,7 +255,7 @@ export default class PMStroll
 
         const clonedGraph = this.prepareGraph(start, end, polygonalMap);
 
-        return new Dijkstra(start, end, clonedGraph).getPath();
+        return new Dijkstra(start, end, clonedGraph).search();
 
     }  // end pathDijkstra
 
@@ -266,7 +266,7 @@ export default class PMStroll
 
         const clonedGraph = this.prepareGraph(start, end, polygonalMap);
 
-        return new AStar(start, end, clonedGraph, heuristic).getPath();
+        return new AStar(start, end, clonedGraph, heuristic).search();
 
     } // end pathAStar
 
