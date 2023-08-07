@@ -182,7 +182,8 @@ export default class PMStroll
 
         for (const poly of polygonalMap.polygons)
         {
-            if (rayPoints.some((point, idx, ary) => poly.contains(point.x, point.y) === firstagain))
+            // if (rayPoints.some((point, idx, ary) => poly.contains(point.x, point.y) === firstagain))
+            if (rayPoints.some(this.isContained, poly) === firstagain)
             {
                 return false
             }
@@ -197,6 +198,14 @@ export default class PMStroll
     itsNear(rayA, rayB, sideA, sideB, recycledVec = new Phaser.Math.Vector2())
     {
         return (recycledVec.setFromObject(rayA, this.epsilon).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayB).fuzzyEquals(sideB, this.epsilon)) || (recycledVec.setFromObject(rayB).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayA).fuzzyEquals(sideB, this.epsilon));
+    }
+
+    isContained(point, idx, ary)
+    {
+        // if (rayPoints.some((point, idx, ary) => poly.contains(point.x, point.y) === firstagain))
+        //console.log(`Poly (${this.points.length}) contains {x: ${point.x}, y: ${point.y}}`, this.contains(point.x, point.y));
+
+        return this.contains(point.x, point.y);
     }
 
     addExtraNodeToClonedGraph(extraNode, clonedGraph, graphKeys, limit, originalPolygonalMap)
