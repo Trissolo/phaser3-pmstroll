@@ -1,99 +1,101 @@
 import Phaser from "phaser";
 
-import PMDebug from "./pmdebug/PMDebug.mjs";
+// Phaser.Math.Vector2
+// Phaser.Math.Distance.BetweenPoints
+const {
+    Vector2,
+    Distance: {BetweenPoints: heuristic}
+} = Phaser.Math;
+
+// Phaser.Geom.Polygon;
+// Phaser.Geom.Line;
+// Phaser.Geom.Line.GetMidPoint;
+// Phaser.Geom.Intersects.LineToLine;
+const {
+    Polygon,
+    Line,
+    Line: {GetMidPoint},
+    Intersects: {LineToLine}
+} = Phaser.Geom;
 
 // generators
-import EachVectorAndAdjacents from "./generators/EachVectorAndAdjacents.mjs";
-import EachPoligonSide from "./generators/EachPoligonSide.mjs";
-import AnyAgainstAllOthers from "./generators/AnyAgainstAllOthers.mjs";
+import {AnyAgainstAllOthers, EachPolygonSide, EachVectorAndAdjacents} from "./generators/index.mjs";
 
-// classes
+// graph
 import GraphManager from "./GraphManager.mjs";
-import VisibilityMap from "./VisibilityMap.mjs";
 
-// utils
-import vector2LikeFromObject from "./utils/vector2LikeFromObject.mjs";
-import setLineFromVectors from "./utils/setLineFromVectors.mjs";
-
-// shortcuts
-const {BetweenPoints: heuristic} = Phaser.Math.Distance;
-const {GetMidPoint} = Phaser.Geom.Line;
-const {LineToLine} = Phaser.Geom.Intersects;
-
+// pathfinding algos
 import Dijkstra from "./pathfinding/Dijkstra.mjs";
+
 import AStar from "./pathfinding/AStar.mjs";
+
+// debug
+import PMDebug from "./pmdebug/PMDebug.mjs";
+
 
 export default class PMStroll
 {
-    // optional
+    // optional:
     // debug;
 
-    // // defaults:
-    // epsilon = 0.03;
+    // defaults:
+    static epsilon = 0.03;
 
-    // splitAmount = 5;
+    static splitAmount = 5;
 
-    // // for recycle:
-    // vertexA = new Phaser.Math.Vector2();
+    // for recycle:
+    static vertexA = new Vector2();
 
-    // vertexB = new Phaser.Math.Vector2();
+    static vertexB = new Vector2();
 
-    // out = new Phaser.Math.Vector2();
+    static out = new Vector2();
 
-
-    constructor(scene)
+    static useDebug(scene)
     {
-        console.log(scene)
-        if (scene)
+        this.debug = new PMDebug(scene);
+        
+        return this;
+    }
+
+    // test simple add
+    static addVisibilityMap(aryOfPhaserPolygonParams)
+    {
+        // 'Build' the VisibilityMap
+
+        // the polygons
+        const polygons = [];
+        
+        for (const phaserPolygonParams of aryOfPhaserPolygonParams)
         {
-            this.debug = new PMDebug(scene);
-
+            polygons.push(new Polygon(phaserPolygonParams));
         }
-        this.debug;
+    
+        // the graph is a standard es6 Map
+        const graph = new Map();
+            
+        // the VisibilityMap is a plain js object, with two proprerties: 'graph' and 'polygons'
+        const visMap = {graph, polygons};
 
-        // defaults:
-        this.epsilon = 0.03;
-    
-        this.splitAmount = 5;
-    
-        // for recycle:
-        this.vertexA = new Phaser.Math.Vector2();
-    
-        this.vertexB = new Phaser.Math.Vector2();
-    
-        this.out = new Phaser.Math.Vector2();
+        // calculate the graph
+        this.grabConcave(visMap)
+            .checkAdjacent(visMap)
+            .connectNodes(visMap);
 
+        // this.visibilityMaps.set(name, visMap);
+
+        console.dir("new VisibilityMap", visMap);
+
+        return visMap;
     }
 
-    // yest simple add
-    addVisibilityMap(aryOfNumberArys)
-    {
-        const pm = new VisibilityMap(aryOfNumberArys);
-
-        this.grabConcave(pm);
-
-        this.checkAdjacent(pm);
-
-        this.connectNodes(pm);
-
-
-        // this.polygonalMaps.set(name, pm);
-
-        // this.drawPolyMap(pm);
-
-        console.dir("PM", pm);
-
-        return pm
-    }
-
-    grabConcave(polygonalMap)
+    static grabConcave(visibilityMap)
     {
         const {vertexA, vertexB} = this;
         
         let isFirstPoly = true;
         
-        //iterate allwalkable poly
-        for (const {points} of polygonalMap.polygons)
+        //iterate all walkable poly
+        for (const {points} of visibilityMap.polygons)
         {
             //iterate all vertices in each poly
             for(const [curr, succ, prec] of EachVectorAndAdjacents(points))
@@ -102,32 +104,31 @@ export default class PMStroll
                 vertexA.copy(succ).subtract(curr);
 
                 vertexB.copy(curr).subtract(prec);
-
-                
-                if( (vertexB.cross(vertexA) < 0) === isFirstPoly)
+     
+                if( (vertexB.cross(vertexA) < 0) === isFirstPoly )
                 {
-                    GraphManager.addNode(curr, polygonalMap.graph)
+                    GraphManager.addNode(curr, visibilityMap.graph);
                 }
             
             }
             
-            // after the first iteration, i.e. *from now*, 'isFirstPoly' must be false
+            // The fist polygon - the walkable one - has been checked. The remaining obstacle-polys need 'isFirstPoly' to be false
             isFirstPoly = false;
         
         }
+
+        return this;
         
     } // end grabConcave
 
-
-    checkAdjacent(polygonalMap)
+    static checkAdjacent(visibilityMap)
     {
-        const {graph} = polygonalMap;
+        const {graph} = visibilityMap;
 
-        for (const polygon of polygonalMap.polygons)
+        for (const {points} of visibilityMap.polygons)
         {
-
-            // EachPoligonSide
-            for (const [sidePointA, sidePointB] of EachPoligonSide(polygon.points))
+            // EachPolygonSide
+            for (const [sidePointA, sidePointB] of EachPolygonSide(points))
             {
                 if (graph.has(sidePointA) && graph.has(sidePointB))
                 {
@@ -135,40 +136,42 @@ export default class PMStroll
                 }
             }
         }
+
+        return this;
+
     } // end checkAdjacent
 
-    connectNodes(polygonalMap, graph = polygonalMap.graph)
+    static connectNodes(visibilityMap, graph = visibilityMap.graph)
     {
         for (const [concaveA, concaveB] of AnyAgainstAllOthers([...graph.keys()]))
         {
-            if (this.quickInLineOfSight(concaveA, concaveB, polygonalMap))
+            if (this.quickInLineOfSight(concaveA, concaveB, visibilityMap))
             {
-                GraphManager.addEdge(concaveA, concaveB, heuristic(concaveA, concaveB), graph)
+                GraphManager.addEdge(concaveA, concaveB, heuristic(concaveA, concaveB), graph);
             }
         }
     }
 
-    quickInLineOfSight(start, end, polygonalMap)
+    static quickInLineOfSight(start, end, visibilityMap)
     {
         //the segment to check against any polygon side
-        const ray = new Phaser.Geom.Line();
-        setLineFromVectors(ray, start, end);
+        const ray = new Line().setFromObjects(start, end);
 
         //One side of current polygon
-        const polygonSide = new Phaser.Geom.Line();
+        const polygonSide = new Line();
 
-        // temp Vector2
-        const tempVec2 = new Phaser.Math.Vector2()
+        // internal recycled Vector2
+        const tempVec = new Vector2();
 
-        for (const {points} of polygonalMap.polygons)
+        for (const {points} of visibilityMap.polygons)
         {
-            for (const [sidePointA, sidePointB] of EachPoligonSide(points))
+            for (const [sidePointA, sidePointB] of EachPolygonSide(points))
             {
-                setLineFromVectors(polygonSide, sidePointA, sidePointB);
+                polygonSide.setFromObjects(sidePointA, sidePointB);
 
-                if (LineToLine(ray, polygonSide, this.out) && !this.itsNear(start, end, sidePointA, sidePointB, tempVec2))
+                if (LineToLine(ray, polygonSide, this.out) && !this.itsNear(start, end, sidePointA, sidePointB, tempVec))
                 {
-                    return false
+                    return false;
                 }
             }
         }
@@ -178,105 +181,129 @@ export default class PMStroll
 
         rayPoints[0] = GetMidPoint(ray);
 
-        let firstagain = false;
+        let isFirstAgain = false;
 
-        for (const poly of polygonalMap.polygons)
+        for (const poly of visibilityMap.polygons)
         {
-            // if (rayPoints.some((point, idx, ary) => poly.contains(point.x, point.y) === firstagain))
-            if (rayPoints.some(this.isContained, poly) === firstagain)
+            if (rayPoints.some(this.isContained, poly) === isFirstAgain)
             {
-                return false
+                return false;
             }
 
-            firstagain = true;
+            isFirstAgain = true;
         }
 
-        return true
+        return true;
 
     } // end quickInLineOfSight
 
-    itsNear(rayA, rayB, sideA, sideB, recycledVec = new Phaser.Math.Vector2())
+    static itsNear(rayA, rayB, sideA, sideB, recycledVec = new Vector2())
     {
-        return (recycledVec.setFromObject(rayA, this.epsilon).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayB).fuzzyEquals(sideB, this.epsilon)) || (recycledVec.setFromObject(rayB).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayA).fuzzyEquals(sideB, this.epsilon));
+        return (recycledVec.setFromObject(rayA).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayB).fuzzyEquals(sideB, this.epsilon)) || (recycledVec.setFromObject(rayB).fuzzyEquals(sideA, this.epsilon) || recycledVec.setFromObject(rayA).fuzzyEquals(sideB, this.epsilon));
     }
 
-    isContained(point, idx, ary)
+    static isContained(point) //, idx, ary)
     {
-        // if (rayPoints.some((point, idx, ary) => poly.contains(point.x, point.y) === firstagain))
-        //console.log(`Poly (${this.points.length}) contains {x: ${point.x}, y: ${point.y}}`, this.contains(point.x, point.y));
-
         return this.contains(point.x, point.y);
     }
 
-    addExtraNodeToClonedGraph(extraNode, clonedGraph, graphKeys, limit, originalPolygonalMap)
+    static prepareGraph(start, end, visibilityMap)
     {
-        GraphManager.addNode(extraNode, clonedGraph);
+        // 1) clone the base Graph:
+        const clonedGraph = GraphManager.cloneGraph(visibilityMap.graph);
 
-        for (let i = 0; i < limit; i++)
-        {
-            const node = graphKeys[i];
-
-            if (this.quickInLineOfSight(extraNode, node, originalPolygonalMap))
-            {
-                GraphManager.addEdge(extraNode, node, heuristic(extraNode, node), clonedGraph);
-            }
-        }
-
-        //just in case...
-        return clonedGraph
-    }
-
-    prepareGraph(start, end, polygonalMap)
-    {
-        // 1) Clone the Graph:
-        const clonedGraph = GraphManager.cloneGraph(polygonalMap.graph);
-
-        // console.log("Current clonedGraph size", clonedGraph.size)
-
-        // 2) Extract the Keys (extract the keys, which are used to create the edges of the new node):
+        // 2) get the vertices to be checked against the new one
         const graphKeys = [...clonedGraph.keys()];
 
-        // 3) the highest node index - when creating edges you don't need to go further
-        let {length} = graphKeys;
+        // 3) create edge if needed
+        for (const newVertex of [start, end])
+        {
+            GraphManager.addNode(newVertex, clonedGraph);
 
-        // 4) Add and connect the new Node
-        this.addExtraNodeToClonedGraph(start, clonedGraph, graphKeys, length, polygonalMap);
+            for (const existingVertex of graphKeys)
+            {
+                if (this.quickInLineOfSight(newVertex, existingVertex, visibilityMap))
+                {
+                    GraphManager.addEdge(newVertex, existingVertex, heuristic(newVertex, existingVertex), clonedGraph);
+                }
+            }
 
-        // 5) Before add the second new node update the Keys and 'length'
-        graphKeys.push(start);
+            // From now, the 'newVertex' belongs in the graph, so add it to be checked against the next vertex
+            graphKeys.push(newVertex);
+        }
 
-        //6) 'length'
-        length += 1;
-
-        // 7) Add the 'end' node
-        this.addExtraNodeToClonedGraph(end, clonedGraph, graphKeys, length, polygonalMap);
-
-        // this.debug.showGraph(clonedGraph);
-
-        //done!
-        return clonedGraph
+        return clonedGraph;
     }
 
-    pathDijkstra(start, end, polygonalMap)
+    static pathDijkstra(start, end, visibilityMap)
     {
-        start = vector2LikeFromObject(start);
-        end = vector2LikeFromObject(end);
+        // disposable clones of the two new vertices, although I'm not sure garbage collection will benefit from them
+        start = {x: start.x, y: start.y};
 
-        const clonedGraph = this.prepareGraph(start, end, polygonalMap);
+        end = {x: end.x, y: end.y};
+
+        const clonedGraph = this.prepareGraph(start, end, visibilityMap);
 
         return new Dijkstra(start, end, clonedGraph).search();
 
     }  // end pathDijkstra
 
-    pathAStar(start, end, polygonalMap)
+    static pathAStar(start, end, visibilityMap)
     {
-        start = vector2LikeFromObject(start);
-        end = vector2LikeFromObject(end);
+        // disposable clones of the two new vertices, although I'm not sure garbage collection will benefit from them
+        start = {x: start.x, y: start.y};
+        
+        end = {x: end.x, y: end.y};
 
-        const clonedGraph = this.prepareGraph(start, end, polygonalMap);
+        const clonedGraph = this.prepareGraph(start, end, visibilityMap);
 
         return new AStar(start, end, clonedGraph, heuristic).search();
 
     } // end pathAStar
 
+    static permittedPosition(point2Like, {polygons})
+    {
+        for (let i = 0, poly, isFirst = false; i < polygons.length; i++)
+        {
+            if (polygons[i].contains(point2Like.x, point2Like.y) === isFirst)
+            {
+                return false;
+            }
+
+            isFirst = true;
+        }
+
+        return true;
+    }
+
 }
+
+// the original 'Phaser.Geom.Line.GetPoints' function, in case it gets changed in the future:
+// function GetPoints(line, quantity, stepRate, out)
+// {
+//     if (out === undefined) { out = []; }
+
+//     //  If quantity is a falsey value (false, null, 0, undefined, etc) then we calculate it based on the stepRate instead.
+//     if (!quantity && stepRate > 0)
+//     {
+//         quantity = Length(line) / stepRate;
+//     }
+
+//     var x1 = line.x1;
+//     var y1 = line.y1;
+
+//     var x2 = line.x2;
+//     var y2 = line.y2;
+
+//     for (var i = 0; i < quantity; i++)
+//     {
+//         var position = i / quantity;
+
+//         var x = x1 + (x2 - x1) * position;
+//         var y = y1 + (y2 - y1) * position;
+
+//         out.push(new Point(x, y));
+//     }
+
+//     return out;
+// }

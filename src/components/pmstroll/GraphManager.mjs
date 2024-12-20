@@ -3,65 +3,68 @@ export default class GraphManager
     static addNode(node, graph)
     {
         graph.set(node, new Map());
-
-        // return node
-    }
-
-    static edgesContainerOf(node, graph)
-    {
-        return graph.get(node);
-    }
-
-    static edgeAlreadyExists(node, neighbor, graph)
-    {
-        return graph.has(node) && this.edgesContainerOf(node, graph).has(neighbor);
     }
 
     static addEdge(node, neighbor, dist, graph)
     {
-        if (!this.edgeAlreadyExists(node, neighbor, graph))
-        {
-            this.edgesContainerOf(node, graph).set(neighbor, dist);
+        // Paranoid check
+        // if (!graph.has(node))
+        // {
+        //     console.error(node, "Node is absent. Aborting");
+        // }
 
-            this.edgesContainerOf(neighbor, graph).set(node, dist);
+        // if (!graph.has(neighbor))
+        // {
+        //     console.error(neighbor, "For some reason 'point A' is present in the graph, but point B (neighbor) is not. Aborting.");
+        // }
+             
+        if (graph.get(node).has(neighbor))
+        {
+            return;
         }
+
+        graph.get(node).set(neighbor, dist);
+
+        graph.get(neighbor).set(node, dist);
     }
 
     static cloneGraph(graph)
     {
-        const cloneGraph = new Map();
+        const clone = new Map();
 
         for (const [orig, container] of graph)
         {
-
-            const cloneCont = new Map();
-
-            cloneGraph.set(orig, cloneCont);
-
-            for (const [neigh, dist] of container)
-            {
-                cloneCont.set(neigh, dist);
-            }
-
+            clone.set(orig, new Map(container));
         }
 
-        return cloneGraph
+        return clone;
     }
 
     static destroyGraph(graph)
     {
-        for (const [orig, container] of graph)
+        for (const value of graph.values())
         {
-            graph.get(orig).clear();
+            value.clear();
         }
 
-        graph.clear();
+        return graph.clear();
+    }
 
-        // for (const [orig, container] of graph)
-        // {
-        //     console.log("(After) %o -> %o", orig, graph.get(orig));
-        // }
+    static graphToString(graph)
+    {
+        let res = `Visibility Map (${graph.size})\n`;
         
-        // return graph
+        for (const [pointA, edges] of graph)
+        {
+            let stringEdges = "";
+            
+            for (const [pointB, distance] of edges)
+            {
+                stringEdges += `\n├── {x: ${pointB.x}, y: ${pointB.y}} -> ${distance}`;
+            }
+            res += `\n\n{x: ${pointA.x}, y: ${pointA.y}}\n|` + stringEdges+"\n\t";
+        }
+        
+        return res;
     }
 }

@@ -1,18 +1,14 @@
-// import Phaser from "phaser";
 import GraphManager from "../GraphManager.mjs";
 import PriorityQueue from "./PriorityQueue.mjs";
 
-export default class Astar
+export default class AStar
 {
-    // start;
-    // target;
-    // graph;
+    costSoFar = new Map();
 
-    // heuristic;
+    fScore = new Map();
 
-    // cameFrom;
-    // costSoFar;
-    // fScore;
+    cameFrom = new Map();
+
     // frontier;
 
     constructor(start, target, graph, heuristic)
@@ -25,20 +21,19 @@ export default class Astar
 
         this.heuristic = heuristic;
 
-        this.costSoFar = new Map(); // [...graph.keys()].map(el => [el, 0]));   
         this.costSoFar.set(start, 0);
 
-        this.fScore = new Map();
-        this.fScore.set(start, 0)
+        this.fScore.set(start, 0);
 
         this.frontier = new PriorityQueue(this.costSoFar);
+
         this.frontier.insert(start);
 
         // visited nodes
         // key<node>
-        // value<(node> (cheapest neighbor)
-        this.cameFrom = new Map();
-        this.cameFrom.set(start, null)
+        // value<node> (cheapest neighbor)
+
+        this.cameFrom.set(start, null);
 
     }
 
@@ -46,11 +41,14 @@ export default class Astar
     {
         const {frontier, costSoFar, cameFrom, fScore, start, target, graph} = this;
 
-        while(!frontier.isEmpty())
+        while (frontier.orderedArr.length !== 0) // !frontier.isEmpty())
         {
             const currentNode = frontier.pop();
 
-            if (currentNode === target) {return this.getPath();}
+            if (currentNode === target)
+            {
+                return this.getPath();
+            }
 
             for (const [neighbor, distance] of graph.get(currentNode))
             {
@@ -72,12 +70,12 @@ export default class Astar
                     fScore.set(neighbor, newCost + this.heuristic(neighbor, target));
 
                     // update frontier determine priority
-                    betterCost? frontier.reorderUpFrom(neighbor) : frontier.insert(neighbor)
+                    betterCost? frontier.reorderUpFrom(neighbor) : frontier.insert(neighbor);
                 }
             }
         }
 
-        return this.getPath()
+        return this.getPath();
     }
 
     getPath()
@@ -90,27 +88,22 @@ export default class Astar
         {
             this.destroy();
             
-            return path
+            return path;
         }
 
-        path.push(currNode);
-
-        // Maybe, to avoid putting the start node in the path array maybe we should:
-        // while (cameFrom.get(currNode) !== start)
-        
         while (currNode !== this.start)
         {
+            path.push({x: currNode.x, y: currNode.y}); //currNode);
+
             currNode = this.cameFrom.get(currNode);
-
-            // path.push(currNode);
-
-            //maybe a new obj?
-            path.push({x: currNode.x, y: currNode.y});
         }
+
+        // If for some reason you want the "start" coordinates to be included in the path, uncomment the next line
+        // path.push({x: currNode.x, y: currNode.y});
 
         this.destroy();
 
-        return path
+        return path;
 	}
 
     destroy()
@@ -120,22 +113,18 @@ export default class Astar
         this.frontier.distancesMap = undefined;
         this.frontier = undefined;
 
-        this.costSoFar.clear();
-        this.costSoFar = undefined;
+        this.costSoFar = this.costSoFar.clear();
 
         this.heuristic = undefined;
 
-        this.fScore.clear();
-        this.fScore = undefined;
-
-        this.cameFrom.clear();
-        this.cameFrom = undefined;
+        this.fScore = this.fScore.clear();
+        
+        this.cameFrom = this.cameFrom.clear();
 
         this.start = undefined;
         this.target = undefined;
 
-        GraphManager.destroyGraph(this.graph);
-        this.graph = undefined;
+        this.graph = GraphManager.destroyGraph(this.graph);
     }
 
 }
